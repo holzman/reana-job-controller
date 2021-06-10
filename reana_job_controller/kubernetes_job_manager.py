@@ -22,6 +22,7 @@ from reana_commons.config import (
     CVMFS_REPOSITORIES,
     K8S_CERN_EOS_AVAILABLE,
     K8S_CERN_EOS_MOUNT_CONFIGURATION,
+    K8S_USE_SECURITY_CONTEXT,
     REANA_COMPONENT_PREFIX,
     REANA_JOB_HOSTPATH_MOUNTS,
     REANA_RUNTIME_KUBERNETES_NAMESPACE,
@@ -199,11 +200,12 @@ class KubernetesJobManager(JobManager):
                 )
                 job_spec["volumes"].append(volume)
 
-        self.job["spec"]["template"]["spec"][
-            "securityContext"
-        ] = client.V1PodSecurityContext(
-            run_as_group=WORKFLOW_RUNTIME_USER_GID, run_as_user=self.kubernetes_uid
-        )
+        if K8S_USE_SECURITY_CONTEXT:
+            self.job["spec"]["template"]["spec"][
+                "securityContext"
+            ] = client.V1PodSecurityContext(
+                run_as_group=WORKFLOW_RUNTIME_USER_GID, run_as_user=self.kubernetes_uid
+            )
 
         if self.kerberos:
             self._add_krb5_init_container(secrets_volume_mount)
@@ -431,6 +433,8 @@ class KubernetesJobManager(JobManager):
 
     def set_user_id(self, kubernetes_uid):
         """Set user id for job pods. UIDs < 100 are refused for security."""
+        if not K8S_USE_SECURITY_CONTEXT:
+            return
         if kubernetes_uid and kubernetes_uid >= 100:
             self.kubernetes_uid = kubernetes_uid
         else:
